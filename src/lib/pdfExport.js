@@ -15,6 +15,11 @@ const MARGIN_X = 38;
 const MARGIN_TOP = 48;
 const MARGIN_BOTTOM = 48;
 const HEADER_H = 42;
+const TITLE_H = 38; // space reserved above the table on page 1 only
+const TITLE_FONT_SIZE = 22;
+const PROJECT_GAP = 0; // white margin between consecutive project blocks
+const CELL_BORDER_W = 2;
+const OUTER_BORDER_W = 3;
 const BASE_ROW_H = 30;
 const LINE_H = 18;
 const CELL_PAD = 8;
@@ -157,10 +162,31 @@ function drawHeader(ctx, top) {
   }
 }
 
+function drawTitle(ctx, title) {
+  const text = typeof title === 'string' ? title.trim() : '';
+  if (!text) return;
+
+  ctx.save();
+  ctx.fillStyle = '#1e3a8a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.direction = ARABIC_PATTERN.test(text) ? 'rtl' : 'ltr';
+
+  let size = TITLE_FONT_SIZE;
+  ctx.font = `700 ${size}px ${FONT}`;
+  while (ctx.measureText(text).width > TABLE_W - 24 && size > 12) {
+    size -= 1;
+    ctx.font = `700 ${size}px ${FONT}`;
+  }
+  ctx.fillText(text, PAGE_W / 2, MARGIN_TOP + TITLE_H / 2, TABLE_W - 24);
+  ctx.restore();
+}
+
 function buildBlocks(scheduled, measureCtx) {
-  measureCtx.font = `400 ${BODY_FONT_SIZE}px ${FONT}`;
   return scheduled.map((project) => {
+    measureCtx.font = `700 ${BODY_FONT_SIZE}px ${FONT}`;
     const projectLines = wrapText(measureCtx, project.name, WIDTHS.project - CELL_PAD * 2);
+    measureCtx.font = `400 ${BODY_FONT_SIZE}px ${FONT}`;
     const studentLines = project.students.map((student) =>
       wrapText(measureCtx, student.name, WIDTHS.students - CELL_PAD * 2),
     );
@@ -185,7 +211,9 @@ function drawSegment(ctx, block, y, startIndex, rows, segmentHeight) {
   });
   drawCellText(ctx, '', X_PROJECT, y, WIDTHS.project, segmentHeight, {
     align: 'center',
+    bold: true,
     lines: block.projectLines,
+    fontSize: 14,
   });
   drawCellText(ctx, project.presentationTime, X_TIME, y, WIDTHS.time, segmentHeight, {
     bold: true,
@@ -199,39 +227,44 @@ function drawSegment(ctx, block, y, startIndex, rows, segmentHeight) {
       const name = String(student.name ?? '');
       drawCellText(ctx, '', X_STUDENTS, rowY, WIDTHS.students, block.rowH, {
         align: 'right',
+        bold: true,
         direction: ARABIC_PATTERN.test(name) ? 'rtl' : 'ltr',
         lines: block.studentLines[startIndex + offset] ?? [''],
       });
-      drawCellText(ctx, String(student.section), X_SECTION, rowY, WIDTHS.section, block.rowH);
+      drawCellText(ctx, String(student.section), X_SECTION, rowY, WIDTHS.section, block.rowH , {bold: true});
     }
   }
 }
 
 function drawGrid(page) {
   const { ctx } = page;
+  const columns = [X_TIME, X_SECTION, X_STUDENTS, X_PROJECT, X_GROUP, X_END];
+  const line = (x1, y1, x2, y2) => {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  };
+
   ctx.save();
   ctx.strokeStyle = '#000';
-  ctx.lineWidth = 1;
   ctx.setLineDash([]);
 
-  for (const x of [X_TIME, X_SECTION, X_STUDENTS, X_PROJECT, X_GROUP, X_END]) {
-    ctx.beginPath();
-    ctx.moveTo(x, MARGIN_TOP);
-    ctx.lineTo(x, page.bottom);
-    ctx.stroke();
+  ctx.lineWidth = CELL_BORDER_W;
+  for (const x of columns) line(x, page.tableTop, x, page.headerBottom);
+  line(MARGIN_X, page.headerBottom, X_END, page.headerBottom);
+
+  // Vertical separators are drawn per project block so the white margin
+  // between projects stays clear instead of being crossed by grid lines.
+  for (const segment of page.segments) {
+    for (const x of columns) line(x, segment.top, x, segment.bottom);
+    line(MARGIN_X, segment.bottom, X_END, segment.bottom);
+    for (const y of segment.innerYs) line(X_SECTION, y, X_PROJECT, y);
   }
-  for (const y of page.fullYs) {
-    ctx.beginPath();
-    ctx.moveTo(MARGIN_X, y);
-    ctx.lineTo(X_END, y);
-    ctx.stroke();
-  }
-  for (const y of page.innerYs) {
-    ctx.beginPath();
-    ctx.moveTo(X_SECTION, y);
-    ctx.lineTo(X_PROJECT, y);
-    ctx.stroke();
-  }
+
+  // Outer frame last so the corners and thick border stay crisp.
+  ctx.lineWidth = OUTER_BORDER_W;
+  ctx.strokeRect(MARGIN_X, page.tableTop, TABLE_W, page.bottom - page.tableTop);
   ctx.restore();
 }
 
@@ -246,7 +279,7 @@ export function renderSchedulePages(projects, settings) {
   let page = null;
   let y = 0;
 
-  function newPage() {
+  function newPage(isFirst) {
     const canvas = document.createElement('canvas');
     canvas.width = PAGE_W * SCALE;
     canvas.height = PAGE_H * SCALE;
@@ -256,47 +289,57 @@ export function renderSchedulePages(projects, settings) {
     ctx.fillRect(0, 0, PAGE_W, PAGE_H);
     ctx.textBaseline = 'middle';
 
+    // The title sits above the table on page 1 only; other pages keep the
+    // original top margin and repeated header.
+    const tableTop = MARGIN_TOP + (isFirst ? TITLE_H : 0);
+    const headerBottom = tableTop + HEADER_H;
     page = {
       canvas,
       ctx,
-      fullYs: [MARGIN_TOP, MARGIN_TOP + HEADER_H],
-      innerYs: [],
-      bottom: MARGIN_TOP + HEADER_H,
+      tableTop,
+      headerBottom,
+      bodyTop: headerBottom,
+      segments: [],
+      bottom: headerBottom,
     };
     pages.push(page);
-    drawHeader(ctx, MARGIN_TOP);
-    y = MARGIN_TOP + HEADER_H;
+    if (isFirst) drawTitle(ctx, settings.pdfTitle);
+    drawHeader(ctx, tableTop);
+    y = headerBottom;
   }
 
   function moveToNextPage() {
     drawGrid(page);
-    newPage();
+    newPage(false);
   }
 
-  newPage();
-  const bodyTop = MARGIN_TOP + HEADER_H;
+  newPage(true);
   const bodyBottom = PAGE_H - MARGIN_BOTTOM;
-  const bodyHeight = bodyBottom - bodyTop;
+  const firstBodyTop = MARGIN_TOP + TITLE_H + HEADER_H;
+  const maxBlockHeight = bodyBottom - firstBodyTop - PROJECT_GAP;
 
   for (const block of blocks) {
     // A project is one indivisible block: never split its students across
     // pages. If it does not fit in the remaining space, start a new page.
     let blockHeight = block.studentCount * block.rowH;
-    if (blockHeight > bodyHeight) {
-      block.rowH = Math.max(18, Math.floor(bodyHeight / block.studentCount));
+    if (blockHeight > maxBlockHeight) {
+      block.rowH = Math.max(16, Math.floor(maxBlockHeight / block.studentCount));
       blockHeight = block.studentCount * block.rowH;
     }
-    if (y > bodyTop && y + blockHeight > bodyBottom) {
+    const gapBefore = y > page.bodyTop ? PROJECT_GAP : 0;
+    if (y + gapBefore + blockHeight > bodyBottom) {
       moveToNextPage();
     }
+    if (y > page.bodyTop) y += PROJECT_GAP;
 
+    const segment = { top: y, bottom: y + blockHeight, innerYs: [] };
+    page.segments.push(segment);
     drawSegment(page.ctx, block, y, 0, block.studentCount, blockHeight);
     for (let offset = 0; offset < block.studentCount - 1; offset += 1) {
-      page.innerYs.push(y + (offset + 1) * block.rowH);
+      segment.innerYs.push(y + (offset + 1) * block.rowH);
     }
     y += blockHeight;
     page.bottom = y;
-    page.fullYs.push(y);
   }
 
   drawGrid(page);

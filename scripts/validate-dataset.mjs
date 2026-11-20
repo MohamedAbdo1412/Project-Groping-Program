@@ -22,6 +22,7 @@ check(studentCount === 95, `student count is 95 (got ${studentCount})`);
 check(JSON.stringify(sections) === JSON.stringify([1, 2, 3, 4]), `section numbers are [1,2,3,4] (got ${JSON.stringify(sections)})`);
 check(DEFAULT_SCHEDULE.settings.startTime === '12:00', 'start time is 12:00');
 check(DEFAULT_SCHEDULE.settings.intervalMinutes === 15, 'interval is 15 minutes');
+check(DEFAULT_SCHEDULE.settings.pdfTitle === 'EMW Project Scheduler', 'default PDF title is EMW Project Scheduler');
 check(JSON.stringify(counts) === JSON.stringify(EXPECTED_STUDENT_COUNTS), `per-project counts match (got ${JSON.stringify(counts)})`);
 check(JSON.stringify(times) === JSON.stringify(EXPECTED_TIMES), 'all 17 presentation times match the expected schedule');
 check(projects.every((project) => project.name.trim() === project.name && project.name.length > 0), 'project names are non-empty and untrimmed');
@@ -41,6 +42,7 @@ console.log(JSON.stringify({
   sectionNumbers: sections,
   startTime: DEFAULT_SCHEDULE.settings.startTime,
   intervalMinutes: DEFAULT_SCHEDULE.settings.intervalMinutes,
+  pdfTitle: DEFAULT_SCHEDULE.settings.pdfTitle,
   firstPresentation: times[0],
   lastPresentation: times[times.length - 1],
   studentCounts: counts,

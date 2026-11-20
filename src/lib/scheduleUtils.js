@@ -1,6 +1,7 @@
 export const DEFAULT_SETTINGS = {
   startTime: '12:00',
   intervalMinutes: 15,
+  pdfTitle: 'EMW Project Scheduler',
 };
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;

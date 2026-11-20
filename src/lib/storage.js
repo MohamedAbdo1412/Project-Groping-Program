@@ -44,6 +44,12 @@ export function normalizeState(raw) {
     Number.isInteger(intervalCandidate) && intervalCandidate >= 1 && intervalCandidate <= MAX_INTERVAL
       ? intervalCandidate
       : DEFAULT_SETTINGS.intervalMinutes;
+  // Missing in older backups: fall back to the default. An intentionally empty
+  // string is preserved so the user can turn the PDF title off.
+  const pdfTitle =
+    typeof rawSettings.pdfTitle === 'string'
+      ? rawSettings.pdfTitle.trim().slice(0, 120)
+      : DEFAULT_SETTINGS.pdfTitle;
 
   const projects = [];
   for (const rawProject of raw.projects) {
@@ -74,7 +80,7 @@ export function normalizeState(raw) {
 
   return {
     version: SCHEMA_VERSION,
-    settings: { startTime, intervalMinutes },
+    settings: { startTime, intervalMinutes, pdfTitle },
     projects,
   };
 }

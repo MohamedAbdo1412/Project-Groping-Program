@@ -5,6 +5,7 @@ export const DEFAULT_SCHEDULE = {
   settings: {
     startTime: '12:00',
     intervalMinutes: 15,
+    pdfTitle: 'EMW Project Schedule',
   },
   projects: [
     {

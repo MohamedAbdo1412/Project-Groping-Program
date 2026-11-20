@@ -1,3 +1,5 @@
+import { DEFAULT_SETTINGS } from '../lib/scheduleUtils.js';
+
 export default function ScheduleSettings({ settings, onChange }) {
   return (
     <section className="panel" aria-labelledby="settings-heading">
@@ -6,6 +8,17 @@ export default function ScheduleSettings({ settings, onChange }) {
         <p>All presentation times are calculated from these settings.</p>
       </div>
       <div className="settings-grid">
+        <label className="field field-wide">
+          <span>PDF Title (first page)</span>
+          <input
+            type="text"
+            value={settings.pdfTitle ?? DEFAULT_SETTINGS.pdfTitle}
+            placeholder={DEFAULT_SETTINGS.pdfTitle}
+            maxLength={120}
+            onChange={(event) => onChange({ pdfTitle: event.target.value })}
+            data-testid="pdf-title-input"
+          />
+        </label>
         <label className="field">
           <span>Starting Time</span>
           <input
